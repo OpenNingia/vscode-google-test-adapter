@@ -10,10 +10,10 @@
   "homepage": "https://github.com/openningia/vscode-google-test-adapter",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hbenl/vscode-google-test-adapter.git"
+    "url": "https://github.com/openningia/vscode-google-test-adapter.git"
   },
   "bugs": {
-    "url": "https://github.com/hbenl/vscode-google-test-adapter/issues"
+    "url": "https://github.com/openningia/vscode-google-test-adapter/issues"
   },
   "categories": [
     "Other"
@@ -23,8 +23,7 @@
     "test",
     "testing",
     "unit test",
-    "google-test",
-    "gmock"
+    "google-test"
   ],
   "main": "out/main.js",
   "scripts": {
