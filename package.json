@@ -4,7 +4,7 @@
   "description": "Run your Google tests in the Sidebar of Visual Studio Code",
   "icon": "icon.png",
   "author": "Daniele Simonetti <oppifjellet@gmail.com>",
-  "publisher": "openningia",
+  "publisher": "OpenNingia",
   "version": "0.1.0",
   "license": "MIT",
   "homepage": "https://github.com/openningia/vscode-google-test-adapter",
