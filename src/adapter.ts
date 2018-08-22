@@ -1,9 +1,8 @@
-import { ChildProcess, execFile } from 'child_process';
+import { ChildProcess, execFile, ExecFileOptionsWithBufferEncoding } from 'child_process';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import * as fs from 'fs'
 import * as xml2js from 'xml2js'
-//import * as xml_entities from 'entities'
 import { TestAdapter, TestEvent, TestInfo, TestSuiteEvent, TestSuiteInfo } from 'vscode-test-adapter-api';
 
 export class GoogleTestAdapter implements TestAdapter {
@@ -31,12 +30,15 @@ export class GoogleTestAdapter implements TestAdapter {
 	) {
 
 		const config = this.getConfiguration();
-		fs.watchFile(this.getExecutable(config), (curr, prev) => {
+		const executable = this.getExecutable(config);
+		if (executable) {
+			fs.watchFile(executable, (curr, prev) => {
 			console.log(`the current mtime is: ${curr.mtime}`);
 			console.log(`the previous mtime was: ${prev.mtime}`);
 
 			this.autorunEmitter.fire();
 		  });		
+	}
 	}
 
 	async load(): Promise<TestSuiteInfo | undefined> {
@@ -45,8 +47,13 @@ export class GoogleTestAdapter implements TestAdapter {
 
 		return await new Promise<TestSuiteInfo | undefined>((resolve, reject) => {
 
+			const executable = this.getExecutable(config);
+			if (!executable) {
+				resolve();
+				return;
+			}
 
-			execFile(this.getExecutable(config), ['--gtest_list_tests'], (error, stdout, stderr) => {
+			execFile(executable, ['--gtest_list_tests'], (error, stdout, stderr) => {
 				if (error) {
 					reject(error);
 				} else {
@@ -98,13 +105,19 @@ export class GoogleTestAdapter implements TestAdapter {
 		await new Promise<void>((resolve, reject) => {
 			let filter = info.id == "AllTests" ? "*" : info.id + "*";
 
-			let exec_options = {
+			let exec_options: ExecFileOptionsWithBufferEncoding = {
 				cwd: this.getCwd(config),
-				env: this.getEnv(config)
+				env: this.getEnv(config),
+				encoding: 'buffer'
 			};
 
+			const executable = this.getExecutable(config);
+			if (!executable) {
+				resolve();
+				return;
+			}
 			this.runningTestProcess = execFile(
-				this.getExecutable(config),
+				executable,
 				['--gtest_filter=' + filter, '--gtest_output=xml'],
 				exec_options,
 				(error, stdout, stderr) => {
@@ -153,7 +166,6 @@ export class GoogleTestAdapter implements TestAdapter {
 											}
 			
 											let passed = messages.length == 0;
-														6
 											this.testStatesEmitter.fire(<TestEvent>{
 												type: 'test',
 												test: test_id,
@@ -202,7 +214,6 @@ export class GoogleTestAdapter implements TestAdapter {
 	}
 
 	private makeSuite(suite_id: string, suite_name: string): TestSuiteInfo {
-
 		return {
 			type: 'suite',
 			id: suite_id,
@@ -220,8 +231,7 @@ export class GoogleTestAdapter implements TestAdapter {
 		};
 	}
 
-	private getEnv(config: vscode.WorkspaceConfiguration): object {
-
+	private getEnv(config: vscode.WorkspaceConfiguration): NodeJS.ProcessEnv {
 		const processEnv = process.env;
 		const configEnv: { [prop: string]: any } = config.get('env') || {};
 
@@ -245,9 +255,9 @@ export class GoogleTestAdapter implements TestAdapter {
 		return configCwd ? path.resolve(dirname, configCwd) : dirname;
 	}
 
-	private getExecutable(config: vscode.WorkspaceConfiguration): string {
+	private getExecutable(config: vscode.WorkspaceConfiguration): string | null {
 		const dirname = this.workspaceFolder.uri.fsPath;
 		const configExe = config.get<string>('executable');
-		return configExe ? path.resolve(dirname, configExe) : dirname;
+		return configExe ? path.resolve(dirname, configExe) : null;
 	}
 }
