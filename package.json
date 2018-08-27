@@ -42,16 +42,15 @@
     "dependencies": {
         "entities": "^1.1.1",
         "tslib": "^1.9.1",
-        "vscode-test-adapter-api": "^0.3.0",
+        "vscode-test-adapter-api": "^1.0.0",
         "xml2js": "^0.4.19"
     },
     "devDependencies": {
         "@types/xml2js": "^0.4.2",
         "@types/xml-parser": "^1.2.29",
         "@types/entities": "^1.1.0",
-        "typescript": "^2.8.3",
-        "vsce": "^1.40.0",
-        "vscode": "^1.1.17"
+        "typescript": "^3.0.1",
+        "vscode": "^1.1.21"
     },
     "engines": {
         "vscode": "^1.23.0"
