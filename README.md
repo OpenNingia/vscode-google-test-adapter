@@ -3,6 +3,8 @@
 This extension allows you to run your [Google tests](https://github.com/google/googletest) using the 
 [Test Explorer for VS Code](https://marketplace.visualstudio.com/items?itemName=hbenl.vscode-test-explorer).
 
+[![Build Status](https://travis-ci.com/OpenNingia/vscode-google-test-adapter.svg?branch=master)](https://travis-ci.com/OpenNingia/vscode-google-test-adapter)
+
 ## Configuration
 
 * `gtestExplorer.executable`: The relative path describing the location of your test executable (relative to the workspace folder)
