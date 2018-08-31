@@ -33,12 +33,12 @@ export class GoogleTestAdapter implements TestAdapter {
 		const executable = this.getExecutable(config);
 		if (executable) {
 			fs.watchFile(executable, (curr, prev) => {
-			console.log(`the current mtime is: ${curr.mtime}`);
-			console.log(`the previous mtime was: ${prev.mtime}`);
+				console.log(`the current mtime is: ${curr.mtime}`);
+				console.log(`the previous mtime was: ${prev.mtime}`);
 
-			this.autorunEmitter.fire();
-		  });		
-	}
+				this.autorunEmitter.fire();
+			});
+		}
 	}
 
 	async load(): Promise<TestSuiteInfo | undefined> {
@@ -58,10 +58,9 @@ export class GoogleTestAdapter implements TestAdapter {
 					reject(error);
 				} else {
 					let lines = stdout.split(/[\n\r]+/);
-					var suite = this.makeSuite("AllTests", "AllTests");
+					var allTestsSuite = this.makeSuite("AllTests", "AllTests");
 
-					var current_suite = suite;
-
+					var current_suite = allTestsSuite;
 					for (var line of lines) {
 						if (line[0] == ' ') {
 							let test_name = line.trim().split(" ")[0];
@@ -69,12 +68,11 @@ export class GoogleTestAdapter implements TestAdapter {
 							current_suite.children.push(test_info);
 						} else if (line.endsWith(".")) {
 							let name = line.slice(0, line.length - 1);
-							var tmp = this.makeSuite(name, name);
-							suite.children.push(tmp);
-							current_suite = tmp;
+							current_suite = this.makeSuite(name, name);
+							allTestsSuite.children.push(current_suite);
 						} // else ignore the line
 					}
-					resolve(suite);
+					resolve(allTestsSuite);
 				}
 			});
 		});
@@ -90,21 +88,21 @@ export class GoogleTestAdapter implements TestAdapter {
 			state: 'running'
 		});
 
-		let report_failure = (reject: (reason?:any)=>void, err: any) => {
-
+		let report_failure = (reject: (reason?: any) => void, error: any) => {
 			this.testStatesEmitter.fire(<TestSuiteEvent>{
 				type: 'suite',
 				suite: 'AllTests',
 				state: 'completed'
 			});
 
+			this.setTestStatesRecursive(info, 'failed', error);
+			
 			this.runningTestProcess = undefined;
-			reject(err);
+			reject(error);
 		};
 
 		await new Promise<void>((resolve, reject) => {
 			let filter = info.id == "AllTests" ? "*" : info.id + "*";
-
 			let exec_options: ExecFileOptionsWithBufferEncoding = {
 				cwd: this.getCwd(config),
 				env: this.getEnv(config),
@@ -121,79 +119,81 @@ export class GoogleTestAdapter implements TestAdapter {
 				['--gtest_filter=' + filter, '--gtest_output=xml'],
 				exec_options,
 				(error, stdout, stderr) => {
-
-					const test_details = path.resolve(this.getCwd(config), 'test_detail.xml');
-
-					if (!fs.existsSync(test_details)) {
-						report_failure(reject, "Test run did not generate any output.");
+					if (error) {
+						report_failure(reject, error);
 					} else {
+						const test_details = path.resolve(this.getCwd(config), 'test_detail.xml');
+						if (!fs.existsSync(test_details)) {
+							reject("Test run did not generate any output.");
+						} else {
 
-						let parser = new xml2js.Parser();
-						fs.readFile(test_details, 'utf8', (err, data) => {
+							let parser = new xml2js.Parser();
+							fs.readFile(test_details, 'utf8', (err, data) => {
 
-							if ( err ) {
-								report_failure(reject, err);
-							} else {
-							
-							parser.parseString(data, (err: any, result: any) => {
-
-								if ( err ) {
+								if (err) {
 									report_failure(reject, err);
 								} else {
-									for (var suite of result.testsuites.testsuite) {
-										const suite_id = suite.$.name;
 
-										this.testStatesEmitter.fire(<TestSuiteEvent>{
-											type: 'suite',
-											suite: suite_id,
-											state: 'running'
-										});										
-			
-										for (var test of suite.testcase) {
-											let messages = [];
-											const test_id = test.$.classname + "." + test.$.name;
+									parser.parseString(data, (err: any, result: any) => {
 
-											this.testStatesEmitter.fire(<TestEvent>{
-												type: 'test',
-												test: test_id,
-												state: 'running'
-											});												
-			
-											if ( "failure" in test ) {
-												for (var failure of test.failure) {
-													messages.push(failure._);
+										if (err) {
+											report_failure(reject, err);
+										} else {
+											for (var suite of result.testsuites.testsuite) {
+												const suite_id = suite.$.name;
+
+												this.testStatesEmitter.fire(<TestSuiteEvent>{
+													type: 'suite',
+													suite: suite_id,
+													state: 'running'
+												});
+
+												for (var test of suite.testcase) {
+													let messages = [];
+													const test_id = test.$.classname + "." + test.$.name;
+
+													this.testStatesEmitter.fire(<TestEvent>{
+														type: 'test',
+														test: test_id,
+														state: 'running'
+													});
+
+													if ("failure" in test) {
+														for (var failure of test.failure) {
+															messages.push(failure._);
+														}
+													}
+
+													let passed = messages.length == 0;
+													this.testStatesEmitter.fire(<TestEvent>{
+														type: 'test',
+														test: test_id,
+														state: passed ? 'passed' : 'failed',
+														message: passed ? null : messages.join("\n")
+													});
 												}
+
+												this.testStatesEmitter.fire(<TestSuiteEvent>{
+													type: 'suite',
+													suite: suite_id,
+													state: 'completed'
+												});
 											}
-			
-											let passed = messages.length == 0;
-											this.testStatesEmitter.fire(<TestEvent>{
-												type: 'test',
-												test: test_id,
-												state: passed ? 'passed' : 'failed',
-												message: passed ? null : messages.join("\n")
+
+											this.testStatesEmitter.fire(<TestSuiteEvent>{
+												type: 'suite',
+												suite: 'AllTests',
+												state: 'completed'
 											});
+
+											this.runningTestProcess = undefined;
+											resolve();
 										}
-			
-										this.testStatesEmitter.fire(<TestSuiteEvent>{
-											type: 'suite',
-											suite: suite_id,
-											state: 'completed'
-										});
-									}			
-			
-									this.testStatesEmitter.fire(<TestSuiteEvent>{
-										type: 'suite',
-										suite: 'AllTests',
-										state: 'completed'
 									});
-			
-									this.runningTestProcess = undefined;
-									resolve();									
+
 								}
 							});
-
-							}
-						});
+						}
 					}
 				});
 		});
@@ -208,7 +208,7 @@ export class GoogleTestAdapter implements TestAdapter {
 			this.runningTestProcess.kill();
 		}
 	}
-	
+
 	private getConfiguration(): vscode.WorkspaceConfiguration {
 		return vscode.workspace.getConfiguration('gtestExplorer', this.workspaceFolder.uri);
 	}
@@ -259,5 +259,22 @@ export class GoogleTestAdapter implements TestAdapter {
 		const dirname = this.workspaceFolder.uri.fsPath;
 		const configExe = config.get<string>('executable');
 		return configExe ? path.resolve(dirname, configExe) : null;
+	}
+
+	private setTestStatesRecursive(
+		info: TestSuiteInfo | TestInfo,
+		state: 'running' | 'passed' | 'failed' | 'skipped',
+		message?: string | undefined
+	) {
+		if (info.type == 'suite') {
+			info.children.forEach(child => this.setTestStatesRecursive(child, state, message));
+		} else {
+			this.testStatesEmitter.fire(<TestEvent>{
+				type: 'test',
+				test: info.id,
+				state: state,
+				message: message
+			});
+		}
 	}
 }
