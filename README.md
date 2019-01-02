@@ -1,3 +1,5 @@
+# This extension is now superseded by [VSCode Catch2 Test Adapter](https://github.com/matepek/vscode-catch2-test-adapter)
+
 # Google Test Explorer
 
 This extension allows you to run your [Google tests](https://github.com/google/googletest) using the 
